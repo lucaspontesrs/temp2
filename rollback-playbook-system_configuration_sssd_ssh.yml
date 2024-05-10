@@ -1,0 +1,731 @@
+#Modulo Configuracao Sistema
+---
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str minimal
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+    - name: Enable and unmask service autofs
+      systemd:
+        name: autofs.service
+        enabled: 'yes'
+        state: started
+        masked: 'no'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - enable_strategy
+        - medium_severity
+        - no_reboot_needed
+
+    - name: Ensure autofs socket is enabled
+      systemd:
+        name: autofs.socket
+        enabled: 'yes'
+        state: started
+        masked: 'no'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - socket_file_exists.stdout_lines is search("autofs.socket",multiline=True)
+      tags:
+        - rollback
+        - enable_strategy
+        - medium_severity
+        - no_reboot_needed
+
+    - name: Remove chrony package
+      package:
+        name: chrony
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - disable_strategy
+        - medium_severity
+        - no_reboot_needed
+
+    - name: Reinstall telnet-server package
+      package:
+        name: telnet-server
+        state: present
+      when: "'telnet-server' not in ansible_facts.packages"
+      tags:
+        - rollback
+        - high_severity
+        - low_complexity
+        - low_disruption
+        - no_reboot_needed
+        - package_telnet-server_reinstalled
+
+    - name: Reinstall tftp-server package
+      package:
+        name: tftp-server
+        state: present
+      when: "'tftp-server' not in ansible_facts.packages"
+      tags:
+        - rollback
+        - high_severity
+        - low_complexity
+        - low_disruption
+        - no_reboot_needed
+        - package_tftp-server_reinstalled
+
+    - name: Reinstall quagga package
+      package:
+        name: quagga
+        state: present
+      when: "'quagga' not in ansible_facts.packages"
+      tags:
+        - rollback
+        - low_severity
+        - low_complexity
+        - low_disruption
+        - no_reboot_needed
+        - package_quagga_reinstalled
+
+
+    - name: Rollback authselect selection
+      ansible.builtin.command:
+        cmd: authselect select "{{ var_previous_authselect_profile }}"
+      when: result_authselect_select is succeeded
+      tags:
+        - rollback
+        - CCE-89732-2
+        - NIST-800-53-AC-3
+        - configure_strategy
+        - enable_authselect
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+
+    - name: Restore previous System Login Banner
+      copy:
+        src: /etc/issue.backup
+        dest: /etc/issue
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-83557-9
+        - NIST-800-171-3.1.9
+        - NIST-800-53-AC-8(a)
+        - NIST-800-53-AC-8(c)
+        - banner_etc_issue
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Remove pam_succeed_if entry from sudo PAM configuration
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/sudo
+        regexp: "^.*pam_succeed_if.*$"
+        state: absent
+      when: "'pam' in ansible_facts.packages"
+      tags:
+        - rollback
+        - CCE-85967-8
+        - NIST-800-53-IA-11
+        - disallow_bypass_password_sudo
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+
+
+    - name: Rollback libuser.conf password hashing algorithm
+      lineinfile:
+        dest: /etc/libuser.conf
+        regexp: '^crypt_style\s*=\s*sha512'
+        state: absent
+      when: '"libuser" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CCE-88865-1
+        - CJIS-5.6.2.2
+        - NIST-800-171-3.13.11
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-IA-5(1)(c)
+        - NIST-800-53-IA-5(c)
+        - PCI-DSS-Req-8.2.1
+        - PCI-DSSv4-8.3.2
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+        - set_password_hashing_algorithm_libuserconf
+
+    - name: Rollback login.defs password hashing algorithm
+      lineinfile:
+        dest: /etc/login.defs
+        regexp: '^ENCRYPT_METHOD\s*{{ var_password_hashing_algorithm }}'
+        state: absent
+      when: '"shadow-utils" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CCE-90590-1
+        - CJIS-5.6.2.2
+        - NIST-800-171-3.13.11
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-IA-5(1)(c)
+        - NIST-800-53-IA-5(c)
+        - PCI-DSS-Req-8.2.1
+        - PCI-DSSv4-8.3.2
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+        - set_password_hashing_algorithm_logindefs
+
+    - name: Rollback password-auth PAM file hashing algorithm
+      lineinfile:
+        dest: /etc/pam.d/password-auth
+        regexp: '^\s*password\s*.*\s*(?:(?:sha(?:512|256|224|1)|md5)\s*)'
+        state: absent
+      when: result_pam_file_present.stat.exists and '"pam" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CCE-85946-2
+        - CJIS-5.6.2.2
+        - NIST-800-171-3.13.11
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-IA-5(1)(c)
+        - NIST-800-53-IA-5(c)
+        - PCI-DSS-Req-8.2.1
+        - configure_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - set_password_hashing_algorithm_passwordauth
+
+
+    - name: Remove RekeyLimit configuration from /etc/ssh/ssh_config
+      lineinfile:
+        path: /etc/ssh/ssh_config
+        create: false
+        regexp: '^(\s*)RekeyLimit.*$'
+        state: absent
+      tags:
+        - rollback
+        - ssh_configuration
+
+    - name: Remove RekeyLimit configuration from include config files of ssh client
+      lineinfile:
+        path: '{{ item }}'
+        regexp: '^(\s*)RekeyLimit.*$'
+        state: absent
+      loop: '{{ ssh_config_include_files.files }}'
+      tags:
+        - rollback
+        - ssh_configuration
+
+    - name: Remove the specific RekeyLimit configuration file /etc/ssh/ssh_config.d/02-rekey-limit.conf
+      file:
+        path: /etc/ssh/ssh_config.d/02-rekey-limit.conf
+        state: absent
+      tags:
+        - rollback
+        - ssh_configuration
+
+
+    - name: Re-enable SSH Access via Empty Passwords
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "PermitEmptyPasswords"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_empty_passwords
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "PermitEmptyPasswords"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_empty_passwords
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Re-enable GSSAPI Authentication
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "GSSAPIAuthentication"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_gssapi_authentication
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "GSSAPIAuthentication"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_gssapi_authentication
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Re-enable SSH Root Login
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "PermitRootLogin"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_root_login
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "PermitRootLogin"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_root_login
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+
+    - name: Re-enable X11 Forwarding
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "X11Forwarding"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_x11_forwarding
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "X11Forwarding"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_x11_forwarding
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Re-enable PAM
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "UsePAM"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_enable_pam
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "UsePAM"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_enable_pam
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+
+    - name: Re-enable Public Key Authentication
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "PubkeyAuthentication"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_pubkey_authentication
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "PubkeyAuthentication"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_pubkey_authentication
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+
+    - name: Re-enable Use of Strict Mode Checking
+      block:
+        - name: Remove Deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "StrictModes"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_strict_modes
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "StrictModes"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_strict_modes
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+
+    - name: Re-enable SSH Warning Banner
+      block:
+        - name: Remove deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "Banner"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_warning_banner
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "Banner"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_warning_banner
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Re-enable SSH Print Last Log
+      block:
+        - name: Remove deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "PrintLastLog"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_print_last_log
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "PrintLastLog"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_print_last_log
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Remove Force Frequent Session Key Renegotiation
+      block:
+        - name: Remove deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "RekeyLimit"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_rekey_limit
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "RekeyLimit"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_rekey_limit
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Remove LogLevel Setting to VERBOSE
+      block:
+        - name: Remove deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "LogLevel"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_set_loglevel_verbose
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "LogLevel"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_set_loglevel_verbose
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+
+    - name: Remove X11 Use Localhost Configuration
+      block:
+        - name: Remove deduplicated values from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            create: false
+            regexp: '(?i)^\s*{{ "X11UseLocalhost"| regex_escape }}\s+'
+            state: absent
+          tags:
+            - rollback
+            - ssh_x11_use_localhost
+
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: '(?i)^\s*{{ "X11UseLocalhost"| regex_escape }}\s+'
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+          tags:
+            - rollback
+            - ssh_x11_use_localhost
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+    - name: Gather Package Facts (Rollback)
+      package_facts:
+        manager: auto
+      tags:
+        - rollback
+        - gather_package_facts
+
+
+    - name: Rollback - Revert changes made by 'Set SSH Client Alive Count Max' task
+      block:
+        - name: Remove line from /etc/ssh/sshd_config
+          lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: ^\s*ClientAliveCountMax\s+
+            state: absent
+          tags:
+            - rollback
+            - CJIS-5.5.6
+            - NIST-800-171-3.1.11
+            - NIST-800-53-AC-12+
+            - NIST-800-53-AC-17(a)
+            - NIST-800-53-AC-2(5)
+            - NIST-800-53-CM-6(a)
+            - NIST-800-53-SC-10
+            - PCI-DSS-Req-8.1.8
+            - PCI-DSSv4-8.2.8
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - restrict_strategy
+            - sshd_set_keepalive
+
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CJIS-5.5.6
+        - NIST-800-171-3.1.11
+        - NIST-800-53-AC-12
+        - NIST-800-53-AC-17(a)
+        - NIST-800-53-AC-2(5)
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-SC-10
+        - PCI-DSS-Req-8.1.8
+        - PCI-DSSv4-8.2.8
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+        - sshd_set_keepalive
+        
+    - name: Rollback - Revert changes made by 'Force frequent session key renegotiation' task
+      block:
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d for RekeyLimit
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: ^\s*{{ "RekeyLimit"| regex_escape }}\s+
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-90815-2
+        - configure_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sshd_rekey_limit
+
+    - name: Rollback - Revert changes made by 'Set SSH Daemon LogLevel to VERBOSE' task
+      block:
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d for LogLevel
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: ^\s*{{ "LogLevel"| regex_escape }}\s+
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-86923-0
+        - NIST-800-53-AC-17(1)
+        - NIST-800-53-AC-17(a)
+        - NIST-800-53-CM-6(a)
+        - PCI-DSS-Req-2.2.4
+        - PCI-DSSv4-2.2.6
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+        - sshd_set_loglevel_verbose
+
+    - name: Rollback - Revert changes made by 'Prevent remote hosts from connecting to the proxy display' task
+      block:
+        - name: Remove parameter from files in /etc/ssh/sshd_config.d for X11UseLocalhost
+          lineinfile:
+            path: '{{ item.path }}'
+            create: false
+            regexp: ^\s*{{ "X11UseLocalhost"| regex_escape }}\s+
+            state: absent
+          with_items: '{{ _etc_ssh_sshd_config_d_has_parameter.files }}'
+          when: _etc_ssh_sshd_config_d_has_parameter.matched
+
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-89105-1
+        - NIST-800-53-CM-6(b)
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+        - sshd_x11_use_localhost

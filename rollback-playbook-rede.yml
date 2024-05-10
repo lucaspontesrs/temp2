@@ -1,0 +1,792 @@
+#Modulo de rede
+---
+
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+
+    - name: Ensure firewalld is installed
+      package:
+        name: firewalld
+        state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-84021-5
+      - NIST-800-53-CM-6(a)
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_firewalld_installed
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-90833-5
+      - NIST-800-171-3.1.3
+      - NIST-800-171-3.4.7
+      - NIST-800-53-AC-4
+      - NIST-800-53-CA-3(5)
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(b)
+      - NIST-800-53-SC-7(21)
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_firewalld_enabled
+
+    - name: Disable service firewalld
+      block:
+
+      - name: Gather the package facts
+        package_facts:
+          manager: auto
+
+      - name: Disable service firewalld
+        systemd:
+          name: firewalld
+          enabled: 'no'
+          state: stopped
+          masked: 'no'
+        when:
+        - '"firewalld" in ansible_facts.packages'
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"firewalld" in ansible_facts.packages'
+      tags:
+      - CCE-90833-5
+      - NIST-800-171-3.1.3
+      - NIST-800-171-3.4.7
+      - NIST-800-53-AC-4
+      - NIST-800-53-CA-3(5)
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(b)
+      - NIST-800-53-SC-7(21)
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_firewalld_enabled
+
+    - name: Revert network sniffer configuration
+      block:
+        - name: Restore promiscuous mode
+          ansible.builtin.command:
+            cmd: ip link set dev {{ item.split(':')[1] }} multicast on promisc on
+          loop: '{{ network_interfaces.stdout_lines }}'
+          when:
+            - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+            - item.split(':') | length == 3
+          tags:
+            - CCE-83996-9
+            - NIST-800-53-CM-6(a)
+            - NIST-800-53-CM-7(2)
+            - NIST-800-53-CM-7(a)
+            - NIST-800-53-CM-7(b)
+            - NIST-800-53-MA-3
+            - disable_strategy
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - network_sniffer_disabled
+            - no_reboot_needed
+            - restrict_strategy
+
+        - name: Gather the package facts
+          package_facts:
+            manager: auto
+          tags:
+            - CCE-90833-5
+            - NIST-800-171-3.1.3
+            - NIST-800-171-3.4.7
+            - NIST-800-53-AC-4
+            - NIST-800-53-CA-3(5)
+            - NIST-800-53-CM-6(a)
+            - NIST-800-53-CM-7(b)
+            - NIST-800-53-SC-7(21)
+            - disable_strategy
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - service_firewalld_enabled
+      tags:
+        - CCE-83996-9
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(2)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-MA-3
+        - disable_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - network_sniffer_disabled
+        - no_reboot_needed
+        - restrict_strategy
+
+
+ 
+    - name: Removed Configuration sysctl to net.ipv6.conf.all.accept_ra
+      sysctl:
+        name: net.ipv6.conf.all.accept_ra
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84120-5
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_accept_ra
+
+
+    - name: Remount configuration from net.ipv6.conf.all.accept_ra 
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.all.accept_ra'
+        replace: 'net.ipv6.conf.all.accept_ra'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84120-5
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_accept_ra
+
+    - name: Removed libreswan
+      package:
+        name: libreswan
+        state: absent
+      tags:
+        - CCE-84068-6
+        - NIST-800-53-CM-6(a)
+        - PCI-DSS-Req-4.1
+        - PCI-DSSv4-4.2.1
+        - disable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - package_libreswan_installed
+
+
+    - name: Removed Configuration sysctl to net.ipv6.conf.all.accept_source_route
+      sysctl:
+        name: net.ipv6.conf.all.accept_source_route
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84131-2
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - disable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_accept_source_route
+
+    - name: Remount Configuration From net.ipv6.conf.all.accept_source_route 
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.all.accept_source_route'
+        replace: 'net.ipv6.conf.all.accept_source_route'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84131-2
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - disable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_accept_source_route
+
+    - name: Removed Configuration sysctl to net.ipv6.conf.all.accept_redirects
+      sysctl:
+        name: net.ipv6.conf.all.accept_redirects
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84125-4
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(b)
+        - NIST-800-53-CM-6.1(iv)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - disable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_accept_redirects
+
+    - name: Remount Configuration from net.ipv6.conf.all.accept_redirects 
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.all.accept_redirects'
+        replace: 'net.ipv6.conf.all.accept_redirects'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84125-4
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(b)
+        - NIST-800-53-CM-6.1(iv)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - disable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_accept_redirects
+
+
+    - name: Remove sysctl configuration for net.ipv6.conf.default.accept_ra
+      sysctl:
+        name: net.ipv6.conf.default.accept_ra
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84124-7
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_default_accept_ra
+
+    - name: Uncomment occurrences of net.ipv6.conf.default.accept_ra in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.default.accept_ra'
+        replace: 'net.ipv6.conf.default.accept_ra'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84124-7
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_default_accept_ra
+
+    - name: Remove sysctl configuration for net.ipv6.conf.all.forwarding
+      sysctl:
+        name: net.ipv6.conf.all.forwarding
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84114-8
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(b)
+        - NIST-800-53-CM-6.1(iv)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_forwarding
+
+    - name: Uncomment occurrences of net.ipv6.conf.all.forwarding in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.all.forwarding'
+        replace: 'net.ipv6.conf.all.forwarding'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84114-8
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(b)
+        - NIST-800-53-CM-6.1(iv)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_all_forwarding
+
+
+    - name: Remove sysctl configuration for net.ipv4.conf.all.rp_filter
+      sysctl:
+        name: net.ipv4.conf.all.rp_filter
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84008-2
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-SC-7(a)
+        - PCI-DSS-Req-1.4.3
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv4_conf_all_rp_filter
+
+    - name: Uncomment occurrences of net.ipv4.conf.all.rp_filter in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv4.conf.all.rp_filter'
+        replace: 'net.ipv4.conf.all.rp_filter'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84008-2
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-SC-7(a)
+        - PCI-DSS-Req-1.4.3
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv4_conf_all_rp_filter
+
+    - name: Remove sysctl configuration for net.ipv4.conf.all.accept_source_route
+      sysctl:
+        name: net.ipv4.conf.all.accept_source_route
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84001-7
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-SC-5
+        - NIST-800-53-SC-7(a)
+        - PCI-DSS-Req-1.4.3
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv4_conf_all_accept_source_route
+
+    - name: Uncomment occurrences of net.ipv4.conf.all.accept_source_route in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv4.conf.all.accept_source_route'
+        replace: 'net.ipv4.conf.all.accept_source_route'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84001-7
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-SC-5
+        - NIST-800-53-SC-7(a)
+        - PCI-DSS-Req-1.4.3
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv4_conf_all_accept_source_route
+
+    - name: Remove sysctl configuration for net.ipv4.conf.all.accept_redirects
+      sysctl:
+        name: net.ipv4.conf.all.accept_redirects
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84011-6
+        - CJIS-5.10.1.1
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-SC-7(a)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv4_conf_all_accept_redirects
+
+    - name: Uncomment occurrences of net.ipv4.conf.all.accept_redirects in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv4.conf.all.accept_redirects'
+        replace: 'net.ipv4.conf.all.accept_redirects'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84011-6
+        - CJIS-5.10.1.1
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - NIST-800-53-SC-7(a)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv4_conf_all_accept_redirects
+
+    - name: Remove sysctl configuration for net.ipv6.conf.default.accept_source_route
+      sysctl:
+        name: net.ipv6.conf.default.accept_source_route
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84130-4
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(b)
+        - NIST-800-53-CM-6.1(iv)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - PCI-DSS-Req-1.4.3
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_default_accept_source_route
+
+    - name: Uncomment occurrences of net.ipv6.conf.default.accept_source_route in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.default.accept_source_route'
+        replace: 'net.ipv6.conf.default.accept_source_route'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84130-4
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(b)
+        - NIST-800-53-CM-6.1(iv)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - PCI-DSS-Req-1.4.3
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_default_accept_source_route
+
+    - name: Remove sysctl configuration for net.ipv6.conf.default.accept_redirects
+      sysctl:
+        name: net.ipv6.conf.default.accept_redirects
+        state: absent
+        sysctl_file: /etc/sysctl.conf
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84113-0
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_default_accept_redirects
+
+    - name: Uncomment occurrences of net.ipv6.conf.default.accept_redirects in configuration files
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#[\s]*net.ipv6.conf.default.accept_redirects'
+        replace: 'net.ipv6.conf.default.accept_redirects'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84113-0
+        - NIST-800-171-3.1.20
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - enable_strategy
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - sysctl_net_ipv6_conf_default_accept_redirects
+
+
+    - name: Restore previous values for sysctl settings
+      replace:
+        path: '{{ item.path }}'
+        regexp: '^#{{ item.regexp }}'
+        replace: '{{ item.replace }}'
+      loop:
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.conf.default.accept_source_route', replace: 'net.ipv4.conf.default.accept_source_route' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.conf.default.rp_filter', replace: 'net.ipv4.conf.default.rp_filter' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.icmp_echo_ignore_broadcasts', replace: 'net.ipv4.icmp_echo_ignore_broadcasts' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.tcp_invalid_ratelimit', replace: 'net.ipv4.tcp_invalid_ratelimit' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.tcp_syncookies', replace: 'net.ipv4.tcp_syncookies' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.conf.all.send_redirects', replace: 'net.ipv4.conf.all.send_redirects' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.conf.default.send_redirects', replace: 'net.ipv4.conf.default.send_redirects' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv4.ip_forward', replace: 'net.ipv4.ip_forward' }
+        - { path: '/etc/sysctl.conf', regexp: 'net.ipv6.conf.all.accept_redirects', replace: 'net.ipv6.conf.all.accept_redirects' }
+      tags:
+        - rollback
+
+    - name: Revert changes made by sysctl configuration
+      replace:
+        path: '{{ item.path }}'
+        regexp: '#net.ipv6.conf.all.forwarding'
+        replace: 'net.ipv6.conf.all.forwarding'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - sysctl_net_ipv6_conf_all_forwarding
+
+    - name: Revert changes made by sysctl configuration
+      replace:
+        path: '{{ item.path }}'
+        regexp: '#net.ipv6.conf.default.accept_redirects'
+        replace: 'net.ipv6.conf.default.accept_redirects'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - sysctl_net_ipv6_conf_default_accept_redirects
+
+    - name: Revert changes made by sysctl configuration
+      replace:
+        path: '{{ item.path }}'
+        regexp: '#net.ipv6.conf.default.accept_source_route'
+        replace: 'net.ipv6.conf.default.accept_source_route'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - sysctl_net_ipv6_conf_default_accept_source_route
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/atm.conf
+        regexp: 'install\s+atm'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_atm_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/atm.conf
+        regexp: '^blacklist atm$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_atm_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/can.conf
+        regexp: 'install\s+can'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_can_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/can.conf
+        regexp: '^blacklist can$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_can_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/sctp.conf
+        regexp: 'install\s+sctp'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_sctp_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/sctp.conf
+        regexp: '^blacklist sctp$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_sctp_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/tipc.conf
+        regexp: 'install\s+tipc'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_tipc_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/tipc.conf
+        regexp: '^blacklist tipc$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_tipc_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/bluetooth.conf
+        regexp: 'install\s+bluetooth'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_bluetooth_disabled
+
+    - name: Revert changes made by kernel module configuration
+      lineinfile:
+        dest: /etc/modprobe.d/bluetooth.conf
+        regexp: '^blacklist bluetooth$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_bluetooth_disabled

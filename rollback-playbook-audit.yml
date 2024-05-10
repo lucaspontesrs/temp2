@@ -1,0 +1,454 @@
+#Modulo Audit
+---
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    var_auditd_disk_error_action: !!str halt
+    var_auditd_disk_full_action: !!str halt
+    var_auditd_action_mail_acct: !!str root
+    var_auditd_admin_space_left_action: !!str single
+    var_auditd_admin_space_left_percentage: !!str 5
+    var_auditd_max_log_file_action: !!str rotate
+    var_auditd_space_left_action: !!str email
+    var_auditd_space_left_percentage: !!str 25
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+  
+  
+  
+    - name: Ensure audispd-plugins is absent
+      package:
+        name: audispd-plugins
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83648-6
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_audispd-plugins_installed
+
+    - name: Ensure audit is absent
+      package:
+        name: audit
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83649-4
+      - NIST-800-53-AC-7(a)
+      - NIST-800-53-AU-12(2)
+      - NIST-800-53-AU-14
+      - NIST-800-53-AU-2(a)
+      - NIST-800-53-AU-7(1)
+      - NIST-800-53-AU-7(2)
+      - NIST-800-53-CM-6(a)
+      - PCI-DSS-Req-10.1
+      - PCI-DSSv4-10.2.1
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_audit_installed
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-90829-3
+      - CJIS-5.4.1.1
+      - NIST-800-171-3.3.1
+      - NIST-800-171-3.3.2
+      - NIST-800-171-3.3.6
+      - NIST-800-53-AC-2(g)
+      - NIST-800-53-AC-6(9)
+      - NIST-800-53-AU-10
+      - NIST-800-53-AU-12(c)
+      - NIST-800-53-AU-14(1)
+      - NIST-800-53-AU-2(d)
+      - NIST-800-53-AU-3
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SI-4(23)
+      - PCI-DSS-Req-10.1
+      - PCI-DSSv4-10.2.1
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_auditd_enabled
+
+    - name: Disable service auditd
+      systemd:
+        name: auditd
+        enabled: 'no'
+        state: stopped
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"audit" in ansible_facts.packages'
+      tags:
+      - CCE-90829-3
+      - CJIS-5.4.1.1
+      - NIST-800-171-3.3.1
+      - NIST-800-171-3.3.2
+      - NIST-800-171-3.3.6
+      - NIST-800-53-AC-2(g)
+      - NIST-800-53-AC-6(9)
+      - NIST-800-53-AU-10
+      - NIST-800-53-AU-12(c)
+      - NIST-800-53-AU-14(1)
+      - NIST-800-53-AU-2(d)
+      - NIST-800-53-AU-3
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SI-4(23)
+      - PCI-DSS-Req-10.1
+      - PCI-DSSv4-10.2.1
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_auditd_enabled
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-83651-0
+      - CJIS-5.4.1.1
+      - NIST-800-171-3.3.1
+      - NIST-800-53-AC-17(1)
+      - NIST-800-53-AU-10
+      - NIST-800-53-AU-14(1)
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IR-5(1)
+      - PCI-DSS-Req-10.3
+      - PCI-DSSv4-10.7
+      - grub2_audit_argument
+      - low_disruption
+      - low_severity
+      - medium_complexity
+      - reboot_required
+      - restrict_strategy
+
+    - name: Remove audit argument from grub defaults and the bootloader menu
+      command: /sbin/grubby --update-kernel=ALL --remove-args="audit=1"
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-83651-0
+      - CJIS-5.4.1.1
+      - NIST-800-171-3.3.1
+      - NIST-800-53-AC-17(1)
+      - NIST-800-53-AU-10
+      - NIST-800-53-AU-14(1)
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IR-5(1)
+      - PCI-DSS-Req-10.3
+      - PCI-DSSv4-10.7
+      - grub2_audit_argument
+      - low_disruption
+      - low_severity
+      - medium_complexity
+      - reboot_required
+      - restrict_strategy
+
+
+    - name: Remove audit_backlog_limit argument from grub defaults and the bootloader menu
+      command: /sbin/grubby --update-kernel=ALL --remove-args="audit_backlog_limit=8192"
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-83652-8
+      - NIST-800-53-CM-6(a)
+      - grub2_audit_backlog_limit_argument
+      - low_disruption
+      - low_severity
+      - medium_complexity
+      - reboot_required
+      - restrict_strategy
+
+
+    - name: Remove pti argument from grub defaults and the bootloader menu
+      command: /sbin/grubby --update-kernel=ALL --remove-args="pti=on"
+      when:
+        - '"grub2-common" in ansible_facts.packages'
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-83843-3
+        - NIST-800-53-SI-16
+        - grub2_pti_argument
+        - low_disruption
+        - low_severity
+        - medium_complexity
+        - reboot_required
+        - restrict_strategy
+
+    - name: Remove vsyscall argument from grub defaults and the bootloader menu
+      command: /sbin/grubby --update-kernel=ALL --remove-args="vsyscall=none"
+      when:
+        - '"grub2-common" in ansible_facts.packages'
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-83842-5
+        - NIST-800-53-CM-7(a)
+        - grub2_vsyscall_argument
+        - low_disruption
+        - medium_complexity
+        - medium_severity
+        - reboot_required
+        - restrict_strategy
+
+    - name: Ensure rsyslog-gnutls is absent
+      package:
+        name: rsyslog-gnutls
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-83987-8
+        - enable_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - package_rsyslog-gnutls_installed
+
+    - name: Ensure rsyslog is absent
+      package:
+        name: rsyslog
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-84063-7
+        - NIST-800-53-CM-6(a)
+        - enable_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - package_rsyslog_installed
+
+    - name: Stop and disable service rsyslog
+      systemd:
+        name: rsyslog
+        state: stopped
+        enabled: no
+      when:
+        - '"rsyslog" in ansible_facts.packages'
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - CCE-83989-4
+        - NIST-800-53-AU-4(1)
+        - NIST-800-53-CM-6(a)
+        - enable_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - service_rsyslog_enabled
+
+
+    - name: Rollback changes for Rsyslog configuration
+      block:
+        - name: Rollback Rsyslog Authenticates Off-Loaded Audit Records
+          block:
+            - name: Remove $ActionSendStreamDriverAuthMode line from /etc/rsyslog.conf
+              lineinfile:
+                path: /etc/rsyslog.conf
+                create: false
+                regexp: ^\s*{{ "$ActionSendStreamDriverAuthMode"| regex_escape }}\s
+                state: absent
+
+            - name: Remove $ActionSendStreamDriverAuthMode parameter from files in /etc/rsyslog.d
+              lineinfile:
+                path: '{{ item.path }}'
+                create: false
+                regexp: ^\s*{{ "$ActionSendStreamDriverAuthMode"| regex_escape }}\s
+                state: absent
+              with_items: '{{ _etc_rsyslog_d_has_parameter.files }}'
+              when: _etc_rsyslog_d_has_parameter.matched
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - CCE-86871-1
+            - NIST-800-53-AU-4(1)
+            - configure_strategy
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - rsyslog_encrypt_offload_actionsendstreamdriverauthmode
+
+        - name: Rollback Rsyslog Encrypts Off-Loaded Audit Records
+          block:
+            - name: Remove $ActionSendStreamDriverMode line from /etc/rsyslog.conf
+              lineinfile:
+                path: /etc/rsyslog.conf
+                create: false
+                regexp: '^\s*{{ "$ActionSendStreamDriverMode"| regex_escape }} '
+                state: absent
+
+            - name: Remove $ActionSendStreamDriverMode parameter from files in /etc/rsyslog.d
+              lineinfile:
+                path: '{{ item.path }}'
+                create: false
+                regexp: '^\s*{{ "$ActionSendStreamDriverMode"| regex_escape }} '
+                state: absent
+              with_items: '{{ _etc_rsyslog_d_has_parameter.files }}'
+              when: _etc_rsyslog_d_has_parameter.matched
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - CCE-90191-8
+            - NIST-800-53-AU-4(1)
+            - configure_strategy
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - rsyslog_encrypt_offload_actionsendstreamdrivermode
+
+        - name: Rollback Rsyslog Encrypts Off-Loaded Audit Records
+          block:
+            - name: Remove $DefaultNetstreamDriver line from /etc/rsyslog.conf
+              lineinfile:
+                path: /etc/rsyslog.conf
+                create: false
+                regexp: '^\s*{{ "$DefaultNetstreamDriver"| regex_escape }} '
+                state: absent
+
+            - name: Remove $DefaultNetstreamDriver parameter from files in /etc/rsyslog.d
+              lineinfile:
+                path: '{{ item.path }}'
+                create: false
+                regexp: '^\s*{{ "$DefaultNetstreamDriver"| regex_escape }} '
+                state: absent
+              with_items: '{{ _etc_rsyslog_d_has_parameter.files }}'
+              when: _etc_rsyslog_d_has_parameter.matched
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - CCE-86782-0
+            - NIST-800-53-AU-4(1)
+            - configure_strategy
+            - low_complexity
+            - low_disruption
+            - medium_severity
+            - no_reboot_needed
+            - rsyslog_encrypt_offload_defaultnetstreamdriver
+
+        - name: Rollback Rsyslog Remote Access Monitoring
+          block:
+            - name: Remove remote access method lines from /etc/rsyslog.conf
+              lineinfile:
+                path: /etc/rsyslog.conf
+                regexp: '{{ item.0.regexp }}'
+                state: absent
+              loop: '{{ remote_methods }}'
+
+            - name: Remove remote access method lines from /etc/rsyslog.d files
+              lineinfile:
+                path: '{{ item.path }}'
+                regexp: '{{ item.0.regexp }}'
+                state: absent
+              with_items: '{{ remote_methods|product(conf_files)|list }}'
+              when: item.1.stat.isdir is defined and item.1.stat.isdir
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - CCE-87960-1
+            - NIST-800-53-AC-17(1)
+            - configure_strategy
+            - low_complexity
+            - medium_disruption
+            - medium_severity
+            - no_reboot_needed
+            - rsyslog_remote_access_monitoring
+
+        - name: Rollback Rsyslog Remote Access Monitoring
+          block:
+            - name: Remove remote access method lines from /etc/rsyslog.conf
+              lineinfile:
+                path: '{{ item.1 }}'
+                regexp: '{{ item.0.regexp }}'
+                state: absent
+              loop: '{{ remote_methods|product(conf_files)|list }}'
+              when: item.1.stat.isdir is defined and item.1.stat.isdir
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - CCE-87960-1
+            - NIST-800-53-AC-17(1)
+            - configure_strategy
+            - low_complexity
+            - medium_disruption
+            - medium_severity
+            - no_reboot_needed
+            - rsyslog_remote_access_monitoring
+
+        - name: Rollback Rsyslog Configuration Changes
+          block:
+            - name: Restore original /etc/rsyslog.conf
+              copy:
+                src: /etc/rsyslog.conf.bak
+                dest: /etc/rsyslog.conf
+              when: backup_conf.stat.exists
+          tags:
+            - rollback

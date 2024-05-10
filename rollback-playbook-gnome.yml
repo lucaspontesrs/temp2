@@ -1,0 +1,559 @@
+#Modulo GNOME
+---
+
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-86315-9
+      - NIST-800-171-3.1.2
+      - NIST-800-53-AC-6(1)
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(b)
+      - dconf_gnome_disable_restart_shutdown
+      - high_severity
+      - low_complexity
+      - medium_disruption
+      - no_reboot_needed
+      - unknown_strategy
+
+    - name: Rollback - Revert changes made by 'Check for pam_succeed_if entry' task
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/sudo
+        create: false
+        regexp: pam_succeed_if
+        state: absent
+      when: '"pam" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CCE-85967-8
+        - NIST-800-53-IA-11
+        - disallow_bypass_password_sudo
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - restrict_strategy
+
+    - name: Rollback - Revert changes made by 'Disable Ctrl-Alt-Del Burst Action' task
+      lineinfile:
+        dest: /etc/systemd/system.conf
+        state: present
+        regexp: ^CtrlAltDelBurstAction
+        line: CtrlAltDelBurstAction=none
+        create: true
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - '"systemd" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CCE-90308-8
+        - NIST-800-171-3.4.5
+        - NIST-800-53-AC-6(1)
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-6(a)
+        - disable_ctrlaltdel_burstaction
+        - disable_strategy
+        - high_severity
+        - low_complexity
+        - low_disruption
+        - no_reboot_needed
+
+    - name: Rollback - Revert changes made by 'Ensure opensc is installed' task
+      package:
+        name: opensc
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-83595-9
+        - NIST-800-53-CM-6(a)
+        - enable_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - package_opensc_installed
+
+    - name: Rollback - Revert changes made by 'Ensure pcsc-lite is installed' task
+      package:
+        name: pcsc-lite
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-86280-5
+        - NIST-800-53-CM-6(a)
+        - enable_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+        - package_pcsc-lite_installed
+
+    - name: Rollback - Revert changes made by 'Ensure openssl-pkcs11 is installed' task
+      package:
+        name: openssl-pkcs11
+        state: absent
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - ansible_architecture != "s390x"
+      tags:
+        - rollback
+        - CCE-83596-7
+        - NIST-800-53-CM-6(a)
+        - PCI-DSS-Req-8.3
+        - PCI-DSSv4-8.4
+        - enable_strategy
+        - install_smartcard_packages
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+
+
+    - name: Rollback - Remove opensc conf file
+      file:
+        path: /etc/opensc-{{ ansible_architecture }}.conf
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - CCE-89122-6
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-IA-2(1)
+        - NIST-800-53-IA-2(11)
+        - NIST-800-53-IA-2(2)
+        - NIST-800-53-IA-2(3)
+        - NIST-800-53-IA-2(4)
+        - NIST-800-53-IA-2(6)
+        - NIST-800-53-IA-2(7)
+        - PCI-DSS-Req-8.3
+        - PCI-DSSv4-8.4
+        - configure_opensc_card_drivers
+        - configure_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+
+    - name: Rollback - Restore previous smartcard driver configuration
+      block:
+        - name: Restore previous smartcard driver configuration
+          command: /usr/bin/opensc-tool -S app:default:card_drivers:{{ card_drivers.stdout }}
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - opensc_conf_cd.stat.exists
+      tags:
+        - rollback
+        - CCE-89122-6
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-IA-2(1)
+        - NIST-800-53-IA-2(11)
+        - NIST-800-53-IA-2(2)
+        - NIST-800-53-IA-2(3)
+        - NIST-800-53-IA-2(4)
+        - NIST-800-53-IA-2(6)
+        - NIST-800-53-IA-2(7)
+        - PCI-DSS-Req-8.3
+        - PCI-DSSv4-8.4
+        - configure_opensc_card_drivers
+        - configure_strategy
+        - low_complexity
+        - low_disruption
+        - medium_severity
+        - no_reboot_needed
+
+    - name: Rollback - Remove dconf settings
+      file:
+        path: /etc/dconf/db/gdm.d
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-171-3.1.2
+        - NIST-800-53-AC-6(1)
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(b)
+        - dconf_gnome_disable_restart_shutdown
+        - high_severity
+        - low_complexity
+        - medium_disruption
+        - no_reboot_needed
+        - unknown_strategy
+
+
+
+    - name: Rollback - Remove GNOME3 Login User List settings
+      file:
+        path: /etc/dconf/db/gdm.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-53-AC-23
+        - NIST-800-53-CM-6(a)
+        - dconf_gnome_disable_user_list
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove lock for GNOME3 Login User List settings
+      file:
+        path: /etc/dconf/db/gdm.d/locks/00-security-settings-lock
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-53-AC-23
+        - NIST-800-53-CM-6(a)
+        - dconf_gnome_disable_user_list
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Revert removal-action settings
+      file:
+        path: /etc/dconf/db/local.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_lock_screen_on_smartcard_removal
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove lock for removal-action settings
+      file:
+        path: /etc/dconf/db/local.d/locks/00-security-settings-lock
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_lock_screen_on_smartcard_removal
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+
+    - name: Rollback - Revert GDM Automatic Login settings
+      ini_file:
+        dest: /etc/gdm/custom.conf
+        section: daemon
+        option: AutomaticLoginEnable
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-171-3.1.1
+        - NIST-800-53-AC-6(1)
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(b)
+        - PCI-DSSv4-8.3.1
+        - gnome_gdm_disable_automatic_login
+        - high_severity
+        - low_complexity
+        - medium_disruption
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove GNOME3 Automounting - automount-open settings
+      file:
+        path: /etc/dconf/db/local.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-171-3.1.7
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - PCI-DSSv4-3.4.2
+        - dconf_gnome_disable_automount_open
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove lock for GNOME3 Automounting - automount-open settings
+      file:
+        path: /etc/dconf/db/local.d/locks/00-security-settings-lock
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-171-3.1.7
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - PCI-DSSv4-3.4.2
+        - dconf_gnome_disable_automount_open
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove GNOME3 Automounting - autorun-never settings
+      file:
+        path: /etc/dconf/db/local.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-171-3.1.7
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - dconf_gnome_disable_autorun
+        - low_complexity
+        - low_severity
+        - medium_disruption
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove lock for GNOME3 Automounting - autorun-never settings
+      file:
+        path: /etc/dconf/db/local.d/locks/00-security-settings-lock
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - NIST-800-171-3.1.7
+        - NIST-800-53-CM-6(a)
+        - NIST-800-53-CM-7(a)
+        - NIST-800-53-CM-7(b)
+        - dconf_gnome_disable_autorun
+        - low_complexity
+        - low_severity
+        - medium_disruption
+        - no_reboot_needed
+        - unknown_strategy
+
+
+    - name: Rollback - Revert GNOME3 Screensaver Inactivity Timeout settings
+      file:
+        path: /etc/dconf/db/local.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CJIS-5.5.5
+        - NIST-800-171-3.1.10
+        - NIST-800-53-AC-11(a)
+        - NIST-800-53-CM-6(a)
+        - PCI-DSS-Req-8.1.8
+        - PCI-DSSv4-8.2.8
+        - dconf_gnome_screensaver_idle_delay
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove GNOME3 Screensaver Lock Delay settings
+      file:
+        path: /etc/dconf/db/local.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - CJIS-5.5.5
+        - NIST-800-171-3.1.10
+        - NIST-800-53-AC-11(a)
+        - NIST-800-53-CM-6(a)
+        - PCI-DSS-Req-8.1.8
+        - PCI-DSSv4-8.2.8
+        - dconf_gnome_screensaver_lock_delay
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+    - name: Rollback - Remove GNOME3 Screensaver Lock Enabled settings
+      file:
+        path: /etc/dconf/db/local.d/00-security-settings
+        state: absent
+      when: '"gdm" in ansible_facts.packages' and ansible_distribution == 'SLES'
+      tags:
+        - rollback
+        - CJIS-5.5.5
+        - NIST-800-171-3.1.10
+        - NIST-800-53-CM-6(a)
+        - PCI-DSS-Req-8.1.8
+        - PCI-DSSv4-8.2.8
+        - dconf_gnome_screensaver_lock_enabled
+        - low_complexity
+        - medium_disruption
+        - medium_severity
+        - no_reboot_needed
+        - unknown_strategy
+
+
+    - name: Rollback GNOME3 Screensaver Lock After Idle Period
+      ini_file:
+        dest: /etc/dconf/db/local.d/00-security-settings
+        section: org/gnome/desktop/screensaver
+        option: lock-enabled
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_screensaver_lock_enabled
+
+    - name: Rollback GNOME3 Screensaver Lock User Modification Prevention
+      lineinfile:
+        path: /etc/dconf/db/local.d/locks/00-security-settings-lock
+        regexp: ^/org/gnome/desktop/screensaver/lock-enabled$
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_screensaver_lock_enabled
+
+    - name: Rollback GNOME3 Screensaver Lock After Idle Period (SLES)
+      ini_file:
+        dest: /etc/dconf/db/local.d/00-security-settings
+        section: org/gnome/desktop/lockdown
+        option: disable-lock-screen
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_screensaver_lock_enabled
+
+    - name: Rollback GNOME3 Screensaver Lock User Modification Prevention (SLES)
+      lineinfile:
+        path: /etc/dconf/db/local.d/locks/00-security-settings-lock
+        regexp: ^/org/gnome/desktop/lockdown/disable-lock-screen$
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_screensaver_lock_enabled
+
+    - name: Rollback System Login Banner Modification
+      copy:
+        dest: /etc/issue
+        content: ''
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - banner_etc_issue
+
+    - name: Rollback GNOME3 Login Warning Banner
+      ini_file:
+        dest: /etc/dconf/db/gdm.d/00-security-settings
+        section: org/gnome/login-screen
+        option: banner-message-enable
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_banner_enabled
+
+    - name: Rollback GNOME3 Login Warning Banner User Modification Prevention
+      lineinfile:
+        path: /etc/dconf/db/gdm.d/locks/00-security-settings-lock
+        regexp: ^/org/gnome/login-screen/banner-message-enable$
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_banner_enabled
+
+    - name: Rollback GNOME3 Login Warning Banner Text Modification
+      ini_file:
+        dest: /etc/dconf/db/gdm.d/00-security-settings
+        section: org/gnome/login-screen
+        option: banner-message-text
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_login_banner_text
+
+    - name: Rollback GNOME3 Login Warning Banner Text User Modification Prevention
+      lineinfile:
+        path: /etc/dconf/db/gdm.d/locks/00-security-settings-lock
+        regexp: ^/org/gnome/login-screen/banner-message-text$
+        state: absent
+      when: '"gdm" in ansible_facts.packages'
+      tags:
+        - rollback
+        - dconf_gnome_login_banner_text

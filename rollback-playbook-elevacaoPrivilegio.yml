@@ -1,0 +1,95 @@
+#Modulo Sudo/SU (ELEVACAO)
+---
+
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+    - name: Find files in /etc/sudoers.d/ affected by the script
+      find:
+        paths:
+          - /etc/sudoers.d/
+      register: sudoers_files
+
+    - name: Revert changes in /etc/sudoers.d files
+      replace:
+        regexp: '^# (?!#).*[\s]+NOPASSWD[\s]*\:.*$'
+        replace: ''
+        path: '{{ item.path }}'
+      with_items: '{{ sudoers_files.files }}'
+
+    - name: Revert changes in /etc/sudoers file
+      lineinfile:
+        path: /etc/sudoers
+        regexp: '^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=[\s]*[-]?\w+\b.*$|^Defaults\s(targetpw|rootpw|runaspw)$'
+        state: absent
+
+    - name: Remove duplicate values in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: '^Defaults !(targetpw|rootpw|runaspw)$'
+        state: absent
+
+    - name: Remove duplicate checking tasks
+      tags: always
+      meta: clear_tags
+      tag: CCE-83529-8, NIST-800-53-CM-6(b), NIST-800-53-CM-6.1(iv), low_complexity, low_disruption, medium_severity, no_reboot_needed, restrict_strategy, sudoers_validate_passwd

@@ -1,0 +1,1105 @@
+#Modulo Sudo/SU (ELEVACAO)
+---
+########################################
+
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+
+    - name: Ensure sudo is installed
+      package:
+        name: sudo
+        state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83523-1
+      - NIST-800-53-CM-6(a)
+      - PCI-DSSv4-10.2.1.5
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_sudo_installed
+
+    - name: Find /etc/sudoers.d/ files
+      find:
+        paths:
+        - /etc/sudoers.d/
+      register: sudoers
+      tags:
+      - CCE-83536-3
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_remove_nopasswd
+
+    - name: Remove lines containing NOPASSWD from sudoers files
+      replace:
+        regexp: (^(?!#).*[\s]+NOPASSWD[\s]*\:.*$)
+        replace: '# \g<1>'
+        path: '{{ item.path }}'
+        validate: /usr/sbin/visudo -cf %s
+      with_items:
+      - path: /etc/sudoers
+      - '{{ sudoers.files }}'
+      tags:
+      - CCE-83536-3
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_remove_nopasswd
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-90029-0
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+
+
+    - name: Find out if /etc/sudoers.d/* files contain 'Defaults timestamp_timeout' to
+        be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=.*
+      register: sudoers_d_defaults_timestamp_timeout
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-90029-0
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Remove found occurrences of 'Defaults timestamp_timeout' from /etc/sudoers.d/*
+        files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=.*
+        state: absent
+      with_items: '{{ sudoers_d_defaults_timestamp_timeout.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-90029-0
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Ensure timestamp_timeout is enabled with the appropriate value in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^[\s]*Defaults\s(.*)\btimestamp_timeout[\s]*=[\s]*[-]?\w+\b(.*)$
+        line: Defaults \1timestamp_timeout={{ var_sudo_timestamp_timeout }}\2
+        validate: /usr/sbin/visudo -cf %s
+        backrefs: true
+      register: edit_sudoers_timestamp_timeout_option
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-90029-0
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Enable timestamp_timeout option with appropriate value in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        line: Defaults timestamp_timeout={{ var_sudo_timestamp_timeout }}
+        validate: /usr/sbin/visudo -cf %s
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - edit_sudoers_timestamp_timeout_option is defined and not edit_sudoers_timestamp_timeout_option.changed
+      tags:
+      - CCE-90029-0
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Find out if /etc/sudoers.d/* files contain Defaults targetpw to be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^Defaults targetpw$
+      register: sudoers_d_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove found occurrences of Defaults targetpw from /etc/sudoers.d/* files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^Defaults targetpw$
+        state: absent
+      with_items: '{{ sudoers_d_defaults.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Find out if /etc/sudoers.d/* files contain Defaults rootpw to be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^Defaults rootpw$
+      register: sudoers_d_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove found occurrences of Defaults rootpw from /etc/sudoers.d/* files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^Defaults rootpw$
+        state: absent
+      with_items: '{{ sudoers_d_defaults.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Find out if /etc/sudoers.d/* files contain Defaults runaspw to be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^Defaults runaspw$
+      register: sudoers_d_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove found occurrences of Defaults runaspw from /etc/sudoers.d/* files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^Defaults runaspw$
+        state: absent
+      with_items: '{{ sudoers_d_defaults.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove any ocurrences of Defaults targetpw in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^Defaults targetpw$
+        validate: /usr/sbin/visudo -cf %s
+        state: absent
+      register: sudoers_file_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove any ocurrences of Defaults rootpw in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^Defaults rootpw$
+        validate: /usr/sbin/visudo -cf %s
+        state: absent
+      register: sudoers_file_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove any ocurrences of Defaults runaspw in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^Defaults runaspw$
+        validate: /usr/sbin/visudo -cf %s
+        state: absent
+      register: sudoers_file_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Check for duplicate values
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !targetpw$
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: dupes
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Deduplicate values from /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !targetpw$
+        state: absent
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - dupes.found is defined and dupes.found > 1
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Insert correct line into /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !targetpw$
+        line: Defaults !targetpw
+        state: present
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Check for duplicate values
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !rootpw$
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: dupes
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Deduplicate values from /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !rootpw$
+        state: absent
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - dupes.found is defined and dupes.found > 1
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Insert correct line into /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !rootpw$
+        line: Defaults !rootpw
+        state: present
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Check for duplicate values
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !runaspw$
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: dupes
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Deduplicate values from /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !runaspw$
+        state: absent
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - dupes.found is defined and dupes.found > 1
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Insert correct line into /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !runaspw$
+        line: Defaults !runaspw
+        state: present
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - CCE-83529-8
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+      
+    - name: Ensure sudo is installed
+      package:
+        name: sudo
+        state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6(a)
+      - PCI-DSSv4-2.2.6
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_sudo_installed
+
+
+    - name: Find /etc/sudoers.d/ files
+      ansible.builtin.find:
+        paths:
+        - /etc/sudoers.d/
+      register: sudoers
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_remove_no_authenticate
+
+    - name: Remove lines containing !authenticate from sudoers files
+      ansible.builtin.replace:
+        regexp: (^(?!#).*[\s]+\!authenticate.*$)
+        replace: '# \g<1>'
+        path: '{{ item.path }}'
+        validate: /usr/sbin/visudo -cf %s
+      with_items:
+      - path: /etc/sudoers
+      - '{{ sudoers.files }}'
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_remove_no_authenticate
+
+
+    - name: Find /etc/sudoers.d/ files
+      ansible.builtin.find:
+        paths:
+        - /etc/sudoers.d/
+      register: sudoers
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_remove_nopasswd
+
+    - name: Remove lines containing NOPASSWD from sudoers files
+      ansible.builtin.replace:
+        regexp: (^(?!#).*[\s]+NOPASSWD[\s]*\:.*$)
+        replace: '# \g<1>'
+        path: '{{ item.path }}'
+        validate: /usr/sbin/visudo -cf %s
+      with_items:
+      - path: /etc/sudoers
+      - '{{ sudoers.files }}'
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-11
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_remove_nopasswd
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - NIST-800-53-IA-11
+      - PCI-DSSv4-2.2.6
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+
+
+    - name: Require Re-Authentication When Using the sudo Command - Find /etc/sudoers.d/*
+        files containing 'Defaults timestamp_timeout'
+      ansible.builtin.find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=.*
+      register: sudoers_d_defaults_timestamp_timeout
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-IA-11
+      - PCI-DSSv4-2.2.6
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Require Re-Authentication When Using the sudo Command - Remove 'Defaults timestamp_timeout'
+        from /etc/sudoers.d/* files
+      ansible.builtin.lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=.*
+        state: absent
+      with_items: '{{ sudoers_d_defaults_timestamp_timeout.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-IA-11
+      - PCI-DSSv4-2.2.6
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Require Re-Authentication When Using the sudo Command - Ensure timestamp_timeout
+        has the appropriate value in /etc/sudoers
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        regexp: ^[\s]*Defaults\s(.*)\btimestamp_timeout[\s]*=[\s]*[-]?\w+\b(.*)$
+        line: Defaults \1timestamp_timeout={{ var_sudo_timestamp_timeout }}\2
+        validate: /usr/sbin/visudo -cf %s
+        backrefs: true
+      register: edit_sudoers_timestamp_timeout_option
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-IA-11
+      - PCI-DSSv4-2.2.6
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Require Re-Authentication When Using the sudo Command - Enable timestamp_timeout
+        option with correct value in /etc/sudoers
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        line: Defaults timestamp_timeout={{ var_sudo_timestamp_timeout }}
+        validate: /usr/sbin/visudo -cf %s
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - |
+        edit_sudoers_timestamp_timeout_option is defined and not edit_sudoers_timestamp_timeout_option.changed
+      tags:
+      - NIST-800-53-IA-11
+      - PCI-DSSv4-2.2.6
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+    - name: Require Re-Authentication When Using the sudo Command - Remove timestamp_timeout
+        wrong values in /etc/sudoers
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers
+        regexp: ^[\s]*Defaults\s.*\btimestamp_timeout[\s]*=[\s]*(?!{{ var_sudo_timestamp_timeout
+          }}\b)[-]?\w+\b.*$
+        state: absent
+        validate: /usr/sbin/visudo -cf %s
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-IA-11
+      - PCI-DSSv4-2.2.6
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudo_require_reauthentication
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Find out if /etc/sudoers.d/* files contain Defaults targetpw to be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^Defaults targetpw$
+      register: sudoers_d_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove found occurrences of Defaults targetpw from /etc/sudoers.d/* files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^Defaults targetpw$
+        state: absent
+      with_items: '{{ sudoers_d_defaults.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Find out if /etc/sudoers.d/* files contain Defaults rootpw to be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^Defaults rootpw$
+      register: sudoers_d_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove found occurrences of Defaults rootpw from /etc/sudoers.d/* files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^Defaults rootpw$
+        state: absent
+      with_items: '{{ sudoers_d_defaults.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Find out if /etc/sudoers.d/* files contain Defaults runaspw to be deduplicated
+      find:
+        path: /etc/sudoers.d
+        patterns: '*'
+        contains: ^Defaults runaspw$
+      register: sudoers_d_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove found occurrences of Defaults runaspw from /etc/sudoers.d/* files
+      lineinfile:
+        path: '{{ item.path }}'
+        regexp: ^Defaults runaspw$
+        state: absent
+      with_items: '{{ sudoers_d_defaults.files }}'
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove any ocurrences of Defaults targetpw in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^Defaults targetpw$
+        validate: /usr/sbin/visudo -cf %s
+        state: absent
+      register: sudoers_file_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove any ocurrences of Defaults rootpw in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^Defaults rootpw$
+        validate: /usr/sbin/visudo -cf %s
+        state: absent
+      register: sudoers_file_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Remove any ocurrences of Defaults runaspw in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: ^Defaults runaspw$
+        validate: /usr/sbin/visudo -cf %s
+        state: absent
+      register: sudoers_file_defaults
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Check for duplicate values
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !targetpw$
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: dupes
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Deduplicate values from /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !targetpw$
+        state: absent
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - dupes.found is defined and dupes.found > 1
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Insert correct line into /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !targetpw$
+        line: Defaults !targetpw
+        state: present
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Check for duplicate values
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !rootpw$
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: dupes
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Deduplicate values from /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !rootpw$
+        state: absent
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - dupes.found is defined and dupes.found > 1
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Insert correct line into /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !rootpw$
+        line: Defaults !rootpw
+        state: present
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Check for duplicate values
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !runaspw$
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: dupes
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Deduplicate values from /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !runaspw$
+        state: absent
+      when:
+      - '"sudo" in ansible_facts.packages'
+      - dupes.found is defined and dupes.found > 1
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd
+
+    - name: Insert correct line into /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        create: false
+        regexp: ^Defaults !runaspw$
+        line: Defaults !runaspw
+        state: present
+      when: '"sudo" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6(b)
+      - NIST-800-53-CM-6.1(iv)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      - sudoers_validate_passwd

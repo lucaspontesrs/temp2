@@ -1,0 +1,444 @@
+#Modulo disco e dispositivos
+---
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+  
+    - name: 'Remove nodev Option from /boot if present'
+      mount:
+        path: /boot
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nodev", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nodev" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_boot_nodev
+
+    - name: 'Remove nosuid Option from /boot if present'
+      mount:
+        path: /boot
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nosuid" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_boot_nosuid
+
+    ---
+    - name: 'Remove nosuid Option from /boot if present'
+      mount:
+        path: /boot
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nosuid" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_boot_nosuid
+
+    - name: 'Remove nodev Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nodev", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nodev" in mount_info.options
+
+    - name: 'Remove noexec Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("noexec", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "noexec" in mount_info.options
+
+
+    ---
+    - name: 'Remove noexec Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("noexec", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "noexec" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_dev_shm_noexec
+
+    - name: 'Remove noexec Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("noexec", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "noexec" in mount_info.options
+
+    - name: 'Remove nosuid Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nosuid" in mount_info.options
+
+
+
+    ---
+    - name: 'Remove nosuid Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nosuid" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_dev_shm_nosuid
+
+    - name: 'Remove noexec Option from /dev/shm if present'
+      mount:
+        path: /dev/shm
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("noexec", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "noexec" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_dev_shm_noexec
+
+    - name: 'Remove nosuid Option from /home if present'
+      mount:
+        path: /home
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nosuid" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_home_nosuid
+
+    - name: 'Remove noexec Option from /home if present'
+      mount:
+        path: /home
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace("noexec", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "noexec" in mount_info.options
+      tags:
+        - rollback
+        - mount_option_home_noexec
+
+    - name: Remove noexec from nfs and nfs4 mount points
+      mount:
+        path: '{{ item | regex_search(''TARGET="([^"]+)"'',''\1'') | first }}'
+        src: '{{ item | regex_search(''SOURCE="([^"]+)"'',''\1'') | first }}'
+        fstype: '{{ item | regex_search(''FSTYPE="([^"]+)"'',''\1'') | first }}'
+        state: present
+        opts: '{{ item | regex_search(''OPTIONS="([^"]+)"'',''\1'') | first }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - (points_register.stdout | length > 0) and '\\x09' not in item
+        - "'noexec' in (item | regex_search(''OPTIONS="([^"]+)"'',''\1'') | first)"
+      with_items: '{{ points_register.stdout_lines }}'
+      tags:
+        - rollback
+
+
+    - name: Remove nosuid from nfs and nfs4 mount points
+      mount:
+        path: '{{ item | regex_search(''TARGET="([^"]+)"'',''\1'') | first }}'
+        src: '{{ item | regex_search(''SOURCE="([^"]+)"'',''\1'') | first }}'
+        fstype: '{{ item | regex_search(''FSTYPE="([^"]+)"'',''\1'') | first }}'
+        state: present
+        opts: '{{ item | regex_search(''OPTIONS="([^"]+)"'',''\1'') | first }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - (points_register.stdout | length > 0) and '\\x09' not in item
+        - "'nosuid' in (item | regex_search(''OPTIONS="([^"]+)"'',''\1'') | first)"
+      with_items: '{{ points_register.stdout_lines }}'
+      tags:
+        - rollback
+
+    # Rollback para remover nosuid Option do /boot
+    - name: Remove nosuid Option from /boot
+      mount:
+        path: /boot
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | regex_replace(",nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - mount_info is defined
+        - "nosuid" in mount_info.options
+      tags:
+        - rollback
+
+    # Rollback para remover todas as cláusulas de segurança para cada export
+    - name: Restore security clauses for every export
+      replace:
+        path: /etc/exports
+        regexp: '^(/.*\w+.*\(.*),sec=[^,]*(.*\)\w*$)'
+        replace: '\1,sec=krb5:krb5i:krb5p\2'
+      tags:
+        - rollback
+
+    # Rollback para remover a cláusula de segurança do Kerberos quando nenhuma segurança é definida para uma exportação
+    - name: Remove Kerberos security when no security is defined for an export
+      replace:
+        path: /etc/exports
+        regexp: '^(/.*\w+.*\(.*),sec=krb5:krb5i:krb5p(\)\w*$)'
+        replace: '\1\2'
+      tags:
+        - rollback
+
+    # Rollback para remover a opção nosuid do /boot: Check informações associadas ao ponto de montagem
+    - name: Remove nosuid Option from /boot: Check information associated to mountpoint
+      set_fact:
+        mount_info: null
+      tags:
+        - rollback
+
+    # Rollback para remover a opção nosuid do /boot: Create mount_info dictionary variable
+    - name: Remove nosuid Option from /boot: Create mount_info dictionary variable
+      set_fact:
+        mount_info: null
+      tags:
+        - rollback
+
+    # Rollback para remover a opção nosuid do /boot: Se /boot não estiver montado, criar manualmente informações de montagem
+    - name: Remove nosuid Option from /boot: If /boot not mounted, craft mount_info manually
+      set_fact:
+        mount_info: null
+      tags:
+        - rollback
+
+
+    - name: Remove nodev option from non-root local partitions
+      mount:
+        path: '{{ item.mount }}'
+        src: '{{ item.device }}'
+        opts: '{{ item.options | regex_replace(",nodev", "") }}'
+        state: mounted
+        fstype: '{{ item.fstype }}'
+      when:
+        - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+        - item.mount is match('/\w')
+        - item.options is search('nodev')
+      with_items: '{{ ansible_facts.mounts }}'
+
+    - name: Remove permission nodev from var_removable_partition
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^(\s*{{ var_removable_partition }})\s+([^\s]*)\s+([^\s]*)\s+([^\s]*),nodev(.*)$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+    - name: Remove permission noexec from var_removable_partition
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^(\s*{{ var_removable_partition }})\s+([^\s]*)\s+([^\s]*)\s+([^\s]*),noexec(.*)$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+    - name: Remove permission nosuid from var_removable_partition
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^(\s*{{ var_removable_partition }})\s+([^\s]*)\s+([^\s]*)\s+([^\s]*),nosuid(.*)$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+
+    - name: Remove nodev option from /var/log/audit in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^(\s*{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="device") | list | first }})\s+([^\s]*)\s+([^\s]*)\s+([^\s]*),nodev(.*)$'
+        replace: '\1 \2 \3 \4\5'
+      when: ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | list | count > 0
+
+    - name: Remount /var/log/audit without nodev option
+      mount:
+        path: /var/log/audit
+        src: '{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="device") | list | first }}'
+        opts: '{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="options") | list | first | regex_replace(",nodev", "") }}'
+        state: mounted
+      when: ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | list | count > 0
+
+    - name: Remove noexec option from /var/log/audit in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^(\s*{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="device") | list | first }})\s+([^\s]*)\s+([^\s]*)\s+([^\s]*),noexec(.*)$'
+        replace: '\1 \2 \3 \4\5'
+      when: ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | list | count > 0
+
+    - name: Remount /var/log/audit without noexec option
+      mount:
+        path: /var/log/audit
+        src: '{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="device") | list | first }}'
+        opts: '{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="options") | list | first | regex_replace(",noexec", "") }}'
+        state: mounted
+      when: ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | list | count > 0
+
+    - name: Remove nosuid option from /var/log/audit in /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^(\s*{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="device") | list | first }})\s+([^\s]*)\s+([^\s]*)\s+([^\s]*),nosuid(.*)$'
+        replace: '\1 \2 \3 \4\5'
+      when: ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | list | count > 0
+
+    - name: Remount /var/log/audit without nosuid option
+      mount:
+        path: /var/log/audit
+        src: '{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="device") | list | first }}'
+        opts: '{{ ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | map(attribute="options") | list | first | regex_replace(",nosuid", "") }}'
+        state: mounted
+      when: ansible_mounts | selectattr("mount", "equalto", "/var/log/audit") | list | count > 0
+
+    - name: Rollback - Remove nodev Option from /var/log
+      mount:
+        path: /var/log
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | replace(",nodev", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when: (ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"])
+      tags:
+        - rollback
+
+    - name: Rollback - Remove noexec Option from /var/log
+      mount:
+        path: /var/log
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | replace(",noexec", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when: (ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"])
+      tags:
+        - rollback
+
+    - name: Rollback - Remove nosuid Option from /var/log
+      mount:
+        path: /var/log
+        src: '{{ mount_info.source }}'
+        opts: '{{ mount_info.options | replace(",nosuid", "") }}'
+        state: mounted
+        fstype: '{{ mount_info.fstype }}'
+      when: (ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"])
+      tags:
+        - rollback
+
+    - name: Rollback - Ensure nfs-utils is reinstalled
+      package:
+        name: nfs-utils
+        state: present
+      tags:
+        - rollback

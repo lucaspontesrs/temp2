@@ -1,0 +1,1427 @@
+#Modulo Shell/Kernel/Grub
+---
+
+
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+    - name: Unit Socket Exists - debug-shell.socket
+      command: systemctl -q list-unit-files debug-shell.socket
+      register: socket_file_exists
+      changed_when: false
+      failed_when: socket_file_exists.rc not in [0, 1]
+      check_mode: false
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-90724-6
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+
+    - name: Disable socket debug-shell
+      systemd:
+        name: debug-shell.socket
+        enabled: 'no'
+        state: stopped
+        masked: 'yes'
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - socket_file_exists.stdout_lines is search("debug-shell.socket",multiline=True)
+      tags:
+      - CCE-90724-6
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-90308-8
+      - NIST-800-171-3.4.5
+      - NIST-800-53-AC-6(1)
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-6(a)
+      - disable_ctrlaltdel_burstaction
+      - disable_strategy
+      - high_severity
+      - low_complexity
+      - low_disruption
+      - no_reboot_needed
+
+    - name: Verify GRUB_DISABLE_RECOVERY=true
+      lineinfile:
+        path: /etc/default/grub
+        regexp: ^GRUB_DISABLE_RECOVERY=.*
+        line: GRUB_DISABLE_RECOVERY=true
+        state: present
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-87114-5
+      - NIST-800-171-3.1.2
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-2(1)
+      - grub2_disable_interactive_boot
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+    - name: Verify that Interactive Boot is Disabled in /etc/default/grub
+      replace:
+        dest: /etc/default/grub
+        regexp: systemd.confirm_spawn(=(1|yes|true|on)|\b)
+        replace: systemd.confirm_spawn=no
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-87114-5
+      - NIST-800-171-3.1.2
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-2(1)
+      - grub2_disable_interactive_boot
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+    - name: Verify that Interactive Boot is Disabled (runtime)
+      command: /sbin/grubby --update-kernel=ALL --remove-args="systemd.confirm_spawn"
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-87114-5
+      - NIST-800-171-3.1.2
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-2(1)
+      - grub2_disable_interactive_boot
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+    - name: Regen grub.cfg handle updated GRUB_DISABLE_RECOVERY and confirm_spawn
+      command: grub2-mkconfig -o  /boot/grub2/grub.cfg
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-87114-5
+      - NIST-800-171-3.1.2
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-2(1)
+      - grub2_disable_interactive_boot
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+
+    - name: Require emergency mode password
+      lineinfile:
+        create: true
+        dest: /usr/lib/systemd/system/emergency.service
+        regexp: ^#?ExecStart=
+        line: ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83592-6
+      - NIST-800-171-3.1.1
+      - NIST-800-171-3.4.5
+      - NIST-800-53-AC-3
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-2
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - require_emergency_target_auth
+      - restrict_strategy
+
+
+    - name: Require single user mode password
+      lineinfile:
+        create: true
+        dest: /usr/lib/systemd/system/rescue.service
+        regexp: ^#?ExecStart=
+        line: ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83594-2
+      - NIST-800-171-3.1.1
+      - NIST-800-171-3.4.5
+      - NIST-800-53-AC-3
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-IA-2
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - require_singleuser_auth
+      - restrict_strategy
+
+
+    - name: Ensure tmux is installed
+      package:
+        name: tmux
+        state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83599-1
+      - NIST-800-171-3.1.10
+      - NIST-800-53-CM-6(a)
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_tmux_installed
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-90586-9
+      - configure_bashrc_exec_tmux
+      - configure_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+
+    - name: 'Support session locking with tmux: Determine If the Tmux Launch Script Is
+        Present in /etc/bashrc'
+      ansible.builtin.find:
+        paths: /etc
+        patterns: bashrc
+        contains: .*case "$name" in sshd|login) exec tmux ;; esac.*
+      register: tmux_in_bashrc
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"tmux" in ansible_facts.packages'
+      tags:
+      - CCE-90586-9
+      - configure_bashrc_exec_tmux
+      - configure_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+
+    - name: 'Support session locking with tmux: Determine If the Tmux Launch Script Is
+        Present in /etc/profile.d/*.sh'
+      ansible.builtin.find:
+        paths: /etc/profile.d
+        patterns: '*.sh'
+        contains: .*case "$name" in sshd|login) exec tmux ;; esac.*
+      register: tmux_in_profile_d
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"tmux" in ansible_facts.packages'
+      tags:
+      - CCE-90586-9
+      - configure_bashrc_exec_tmux
+      - configure_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+
+
+
+    - name: Disable acquiring, saving, and processing core dumps - Collect systemd Socket
+        Units Present in the System
+      ansible.builtin.command:
+        cmd: systemctl -q list-unit-files --type socket
+      register: result_systemd_unit_files
+      changed_when: false
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-83974-6
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_systemd-coredump_disabled
+
+    - name: Disable acquiring, saving, and processing core dumps - Ensure systemd-coredump.socket
+        is Masked
+      ansible.builtin.systemd:
+        name: systemd-coredump.socket
+        state: stopped
+        enabled: false
+        masked: true
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - result_systemd_unit_files.stdout_lines is search("systemd-coredump.socket")
+      tags:
+      - CCE-83974-6
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_systemd-coredump_disabled
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-83984-5
+      - NIST-800-53-CM-6
+      - PCI-DSS-Req-3.2
+      - PCI-DSSv4-3.3.1.1
+      - PCI-DSSv4-3.3.1.2
+      - PCI-DSSv4-3.3.1.3
+      - coredump_disable_backtraces
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+    
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-83979-5
+      - NIST-800-53-CM-6
+      - PCI-DSS-Req-3.2
+      - PCI-DSSv4-3.3.1.1
+      - PCI-DSSv4-3.3.1.2
+      - PCI-DSSv4-3.3.1.3
+      - coredump_disable_storage
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-83980-3
+      - NIST-800-53-CM-6
+      - NIST-800-53-SC-7(10)
+      - PCI-DSSv4-3.3.1.1
+      - PCI-DSSv4-3.3.1.2
+      - PCI-DSSv4-3.3.1.3
+      - disable_users_coredumps
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+    
+    - name: Update grub defaults and the bootloader menu
+      command: /sbin/grubby --update-kernel=ALL --args="page_poison=1"
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-83985-2
+      - NIST-800-53-CM-6(a)
+      - grub2_page_poison_argument
+      - low_disruption
+      - medium_complexity
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - CCE-83986-0
+      - NIST-800-53-CM-6(a)
+      - grub2_slub_debug_argument
+      - low_disruption
+      - medium_complexity
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+
+
+    - name: Update grub defaults and the bootloader menu
+      command: /sbin/grubby --update-kernel=ALL --args="slub_debug={{ var_slub_debug_options
+        }}"
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - '"grub2-common" in ansible_facts.packages'
+      tags:
+      - CCE-83986-0
+      - NIST-800-53-CM-6(a)
+      - grub2_slub_debug_argument
+      - low_disruption
+      - medium_complexity
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+
+
+    - name: Ensure policycoreutils-python-utils is installed
+      package:
+        name: policycoreutils-python-utils
+        state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-84070-2
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - package_policycoreutils-python-utils_installed
+
+
+    - name: Ensure policycoreutils is installed
+      package:
+        name: policycoreutils
+        state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-84071-0
+      - enable_strategy
+      - low_complexity
+      - low_disruption
+      - low_severity
+      - no_reboot_needed
+      - package_policycoreutils_installed
+
+
+
+
+
+    - name: Configure SELinux Policy
+      block:
+
+      - name: Check for duplicate values
+        lineinfile:
+          path: /etc/selinux/config
+          create: false
+          regexp: ^SELINUXTYPE=
+          state: absent
+        check_mode: true
+        changed_when: false
+        register: dupes
+
+      - name: Deduplicate values from /etc/selinux/config
+        lineinfile:
+          path: /etc/selinux/config
+          create: false
+          regexp: ^SELINUXTYPE=
+          state: absent
+        when: dupes.found is defined and dupes.found > 1
+
+      - name: Insert correct line to /etc/selinux/config
+        lineinfile:
+          path: /etc/selinux/config
+          create: true
+          regexp: ^SELINUXTYPE=
+          line: SELINUXTYPE={{ var_selinux_policy_name }}
+          state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-84074-4
+      - NIST-800-171-3.1.2
+      - NIST-800-171-3.7.2
+      - NIST-800-53-AC-3
+      - NIST-800-53-AC-3(3)(a)
+      - NIST-800-53-AU-9
+      - NIST-800-53-SC-7(21)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+      - selinux_policytype
+
+
+
+
+
+    - name: Ensure SELinux State is Enforcing
+      block:
+
+      - name: Check for duplicate values
+        lineinfile:
+          path: /etc/selinux/config
+          create: false
+          regexp: ^SELINUX=
+          state: absent
+        check_mode: true
+        changed_when: false
+        register: dupes
+
+      - name: Deduplicate values from /etc/selinux/config
+        lineinfile:
+          path: /etc/selinux/config
+          create: false
+          regexp: ^SELINUX=
+          state: absent
+        when: dupes.found is defined and dupes.found > 1
+
+      - name: Insert correct line to /etc/selinux/config
+        lineinfile:
+          path: /etc/selinux/config
+          create: true
+          regexp: ^SELINUX=
+          line: SELINUX={{ var_selinux_state }}
+          state: present
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-84079-3
+      - NIST-800-171-3.1.2
+      - NIST-800-171-3.7.2
+      - NIST-800-53-AC-3
+      - NIST-800-53-AC-3(3)(a)
+      - NIST-800-53-AU-9
+      - NIST-800-53-SC-7(21)
+      - high_severity
+      - low_complexity
+      - low_disruption
+      - no_reboot_needed
+      - restrict_strategy
+      - selinux_state
+
+
+    - name: Switch to multi-user runlevel
+      file:
+        src: /usr/lib/systemd/system/multi-user.target
+        dest: /etc/systemd/system/default.target
+        state: link
+        force: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - CCE-84105-6
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(a)
+      - NIST-800-53-CM-7(b)
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - reboot_required
+      - restrict_strategy
+      - xwindows_runlevel_target
+
+
+    - name: Block Disable service debug-shell
+      block:
+
+      - name: Disable service debug-shell
+        block:
+
+        - name: Disable service debug-shell
+          systemd:
+            name: debug-shell.service
+            enabled: 'no'
+            state: stopped
+            masked: 'yes'
+        rescue:
+
+        - name: Intentionally ignored previous 'Disable service debug-shell' failure,
+            service was already disabled
+          meta: noop
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+
+    - name: Unit Socket Exists - debug-shell.socket
+      command: systemctl -q list-unit-files debug-shell.socket
+      register: socket_file_exists
+      changed_when: false
+      failed_when: socket_file_exists.rc not in [0, 1]
+      check_mode: false
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+
+    - name: Disable socket debug-shell
+      systemd:
+        name: debug-shell.socket
+        enabled: 'no'
+        state: stopped
+        masked: 'yes'
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - socket_file_exists.stdout_lines is search("debug-shell.socket",multiline=True)
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+      
+      
+    - name: Block Disable service debug-shell
+      block:
+
+      - name: Disable service debug-shell
+        block:
+
+        - name: Disable service debug-shell
+          systemd:
+            name: debug-shell.service
+            enabled: 'no'
+            state: stopped
+            masked: 'yes'
+        rescue:
+
+        - name: Intentionally ignored previous 'Disable service debug-shell' failure,
+            service was already disabled
+          meta: noop
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+
+    - name: Unit Socket Exists - debug-shell.socket
+      command: systemctl -q list-unit-files debug-shell.socket
+      register: socket_file_exists
+      changed_when: false
+      failed_when: socket_file_exists.rc not in [0, 1]
+      check_mode: false
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+
+    - name: Disable socket debug-shell
+      systemd:
+        name: debug-shell.socket
+        enabled: 'no'
+        state: stopped
+        masked: 'yes'
+      when:
+      - ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      - socket_file_exists.stdout_lines is search("debug-shell.socket",multiline=True)
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - service_debug-shell_disabled
+      
+    - name: Disable Ctrl-Alt-Del Reboot Activation
+      systemd:
+        name: ctrl-alt-del.target
+        force: true
+        masked: true
+        state: stopped
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.5
+      - NIST-800-53-AC-6(1)
+      - NIST-800-53-CM-6(a)
+      - disable_ctrlaltdel_reboot
+      - disable_strategy
+      - high_severity
+      - low_complexity
+      - low_disruption
+      - no_reboot_needed
+      
+      
+    - name: Ensure kernel module 'usb-storage' is disabled
+      lineinfile:
+        create: true
+        dest: /etc/modprobe.d/usb-storage.conf
+        regexp: install\s+usb-storage
+        line: install usb-storage /bin/false
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.21
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(a)
+      - NIST-800-53-CM-7(b)
+      - NIST-800-53-MP-7
+      - PCI-DSSv4-3.4.2
+      - disable_strategy
+      - kernel_module_usb-storage_disabled
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+
+    - name: Ensure kernel module 'usb-storage' is blacklisted
+      lineinfile:
+        create: true
+        dest: /etc/modprobe.d/usb-storage.conf
+        regexp: ^blacklist usb-storage$
+        line: blacklist usb-storage
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.21
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(a)
+      - NIST-800-53-CM-7(b)
+      - NIST-800-53-MP-7
+      - PCI-DSSv4-3.4.2
+      - disable_strategy
+      - kernel_module_usb-storage_disabled
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      
+      
+    - name: Ensure kernel module 'cramfs' is disabled
+      lineinfile:
+        create: true
+        dest: /etc/modprobe.d/cramfs.conf
+        regexp: install\s+cramfs
+        line: install cramfs /bin/false
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.6
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(a)
+      - NIST-800-53-CM-7(b)
+      - disable_strategy
+      - kernel_module_cramfs_disabled
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+
+    - name: Ensure kernel module 'cramfs' is blacklisted
+      lineinfile:
+        create: true
+        dest: /etc/modprobe.d/cramfs.conf
+        regexp: ^blacklist cramfs$
+        line: blacklist cramfs
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.4.6
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-CM-7(a)
+      - NIST-800-53-CM-7(b)
+      - disable_strategy
+      - kernel_module_cramfs_disabled
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      
+      
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - NIST-800-53-CM-6
+      - PCI-DSS-Req-3.2
+      - PCI-DSSv4-3.3.1
+      - coredump_disable_backtraces
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+
+    - name: Disable core dump backtraces
+      block:
+
+      - name: Check for duplicate values
+        lineinfile:
+          path: /etc/systemd/coredump.conf
+          create: false
+          regexp: ^\s*ProcessSizeMax\s*=\s*
+          state: absent
+        check_mode: true
+        changed_when: false
+        register: dupes
+
+      - name: Deduplicate values from /etc/systemd/coredump.conf
+        lineinfile:
+          path: /etc/systemd/coredump.conf
+          create: false
+          regexp: ^\s*ProcessSizeMax\s*=\s*
+          state: absent
+        when: dupes.found is defined and dupes.found > 1
+
+      - name: Insert correct line to /etc/systemd/coredump.conf
+        lineinfile:
+          path: /etc/systemd/coredump.conf
+          create: false
+          regexp: ^\s*ProcessSizeMax\s*=\s*
+          line: ProcessSizeMax=0
+          state: present
+      when: '"systemd" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6
+      - PCI-DSS-Req-3.2
+      - PCI-DSSv4-3.3.1
+      - coredump_disable_backtraces
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+      
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - NIST-800-53-CM-6
+      - PCI-DSS-Req-3.2
+      - PCI-DSSv4-3.3.1
+      - coredump_disable_storage
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+
+    - name: Disable storing core dump
+      block:
+
+      - name: Check for duplicate values
+        lineinfile:
+          path: /etc/systemd/coredump.conf
+          create: false
+          regexp: ^\s*Storage\s*=\s*
+          state: absent
+        check_mode: true
+        changed_when: false
+        register: dupes
+
+      - name: Deduplicate values from /etc/systemd/coredump.conf
+        lineinfile:
+          path: /etc/systemd/coredump.conf
+          create: false
+          regexp: ^\s*Storage\s*=\s*
+          state: absent
+        when: dupes.found is defined and dupes.found > 1
+
+      - name: Insert correct line to /etc/systemd/coredump.conf
+        lineinfile:
+          path: /etc/systemd/coredump.conf
+          create: false
+          regexp: ^\s*Storage\s*=\s*
+          line: Storage=none
+          state: present
+      when: '"systemd" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6
+      - PCI-DSS-Req-3.2
+      - PCI-DSSv4-3.3.1
+      - coredump_disable_storage
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+
+    - name: Gather the package facts
+      package_facts:
+        manager: auto
+      tags:
+      - NIST-800-53-CM-6
+      - NIST-800-53-SC-7(10)
+      - PCI-DSSv4-3.3.1
+      - disable_users_coredumps
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+
+    - name: Disable core dumps with limits
+      lineinfile:
+        dest: /etc/security/limits.conf
+        regexp: ^[^#].*core
+        line: '*        hard       core      0'
+        create: true
+      when: '"pam" in ansible_facts.packages'
+      tags:
+      - NIST-800-53-CM-6
+      - NIST-800-53-SC-7(10)
+      - PCI-DSSv4-3.3.1
+      - disable_users_coredumps
+      - low_complexity
+      - low_disruption
+      - medium_severity
+      - no_reboot_needed
+      - restrict_strategy
+
+
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*kernel.randomize_va_space.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.7
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-30
+      - NIST-800-53-SC-30(2)
+      - PCI-DSS-Req-2.2.1
+      - PCI-DSSv4-3.3.1
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_randomize_va_space
+
+    - name: Comment out any occurrences of kernel.randomize_va_space from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*kernel.randomize_va_space
+        replace: '#kernel.randomize_va_space'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.7
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-30
+      - NIST-800-53-SC-30(2)
+      - PCI-DSS-Req-2.2.1
+      - PCI-DSSv4-3.3.1
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_randomize_va_space
+
+    - name: Ensure sysctl kernel.randomize_va_space is set to 2
+      sysctl:
+        name: kernel.randomize_va_space
+        value: '2'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.7
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-30
+      - NIST-800-53-SC-30(2)
+      - PCI-DSS-Req-2.2.1
+      - PCI-DSSv4-3.3.1
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_randomize_va_space
+      
+      
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*kernel.core_pattern.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-SC-7(10)
+      - PCI-DSSv4-3.3.1
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_core_pattern
+
+    - name: Comment out any occurrences of kernel.core_pattern from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*kernel.core_pattern
+        replace: '#kernel.core_pattern'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-SC-7(10)
+      - PCI-DSSv4-3.3.1
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_core_pattern
+
+    - name: Ensure sysctl kernel.core_pattern is set to |/bin/false
+      sysctl:
+        name: kernel.core_pattern
+        value: '|/bin/false'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-SC-7(10)
+      - PCI-DSSv4-3.3.1
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_core_pattern
+
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*kernel.dmesg_restrict.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.5
+      - NIST-800-53-SI-11(a)
+      - NIST-800-53-SI-11(b)
+      - disable_strategy
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      - sysctl_kernel_dmesg_restrict
+
+    - name: Comment out any occurrences of kernel.dmesg_restrict from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*kernel.dmesg_restrict
+        replace: '#kernel.dmesg_restrict'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.5
+      - NIST-800-53-SI-11(a)
+      - NIST-800-53-SI-11(b)
+      - disable_strategy
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      - sysctl_kernel_dmesg_restrict
+
+    - name: Ensure sysctl kernel.dmesg_restrict is set to 1
+      sysctl:
+        name: kernel.dmesg_restrict
+        value: '1'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-171-3.1.5
+      - NIST-800-53-SI-11(a)
+      - NIST-800-53-SI-11(b)
+      - disable_strategy
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      - sysctl_kernel_dmesg_restrict
+      
+      
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*kernel.kexec_load_disabled.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_kexec_load_disabled
+
+    - name: Comment out any occurrences of kernel.kexec_load_disabled from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*kernel.kexec_load_disabled
+        replace: '#kernel.kexec_load_disabled'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_kexec_load_disabled
+
+    - name: Ensure sysctl kernel.kexec_load_disabled is set to 1
+      sysctl:
+        name: kernel.kexec_load_disabled
+        value: '1'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_kexec_load_disabled
+      
+      
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*kernel.perf_event_paranoid.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-AC-6
+      - disable_strategy
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      - sysctl_kernel_perf_event_paranoid
+
+    - name: Comment out any occurrences of kernel.perf_event_paranoid from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*kernel.perf_event_paranoid
+        replace: '#kernel.perf_event_paranoid'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-AC-6
+      - disable_strategy
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      - sysctl_kernel_perf_event_paranoid
+
+    - name: Ensure sysctl kernel.perf_event_paranoid is set to 2
+      sysctl:
+        name: kernel.perf_event_paranoid
+        value: '2'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-AC-6
+      - disable_strategy
+      - low_complexity
+      - low_severity
+      - medium_disruption
+      - reboot_required
+      - sysctl_kernel_perf_event_paranoid
+      
+      
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*kernel.yama.ptrace_scope.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_yama_ptrace_scope
+
+    - name: Comment out any occurrences of kernel.yama.ptrace_scope from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*kernel.yama.ptrace_scope
+        replace: '#kernel.yama.ptrace_scope'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_yama_ptrace_scope
+
+    - name: Ensure sysctl kernel.yama.ptrace_scope is set to 1
+      sysctl:
+        name: kernel.yama.ptrace_scope
+        value: '1'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_kernel_yama_ptrace_scope
+      
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*net.core.bpf_jit_harden.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_net_core_bpf_jit_harden
+
+    - name: Comment out any occurrences of net.core.bpf_jit_harden from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*net.core.bpf_jit_harden
+        replace: '#net.core.bpf_jit_harden'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_net_core_bpf_jit_harden
+
+    - name: Ensure sysctl net.core.bpf_jit_harden is set to 2
+      sysctl:
+        name: net.core.bpf_jit_harden
+        value: '2'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6
+      - NIST-800-53-SC-7(10)
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_net_core_bpf_jit_harden
+      
+    - name: List /etc/sysctl.d/*.conf files
+      find:
+        paths:
+        - /etc/sysctl.d/
+        - /run/sysctl.d/
+        - /usr/local/lib/sysctl.d/
+        contains: ^[\s]*user.max_user_namespaces.*$
+        patterns: '*.conf'
+        file_type: any
+      register: find_sysctl_d
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-39
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_user_max_user_namespaces
+
+    - name: Comment out any occurrences of user.max_user_namespaces from config files
+      replace:
+        path: '{{ item.path }}'
+        regexp: ^[\s]*user.max_user_namespaces
+        replace: '#user.max_user_namespaces'
+      loop: '{{ find_sysctl_d.files }}'
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-39
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_user_max_user_namespaces
+
+    - name: Ensure sysctl user.max_user_namespaces is set to 0
+      sysctl:
+        name: user.max_user_namespaces
+        value: '0'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+      - NIST-800-53-CM-6(a)
+      - NIST-800-53-SC-39
+      - disable_strategy
+      - low_complexity
+      - medium_disruption
+      - medium_severity
+      - reboot_required
+      - sysctl_user_max_user_namespaces

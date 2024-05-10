@@ -1,0 +1,518 @@
+#Modulo Shell/Kernel/Grub
+---
+
+
+
+- hosts: all
+  vars:
+    var_aide_scan_notification_email: !!str root@localhost
+    var_sudo_timestamp_timeout: !!str 0
+    var_authselect_profile: !!str sssd
+    login_banner_text: !!str ^(You[\s\n]+are[\s\n]+accessing[\s\n]+a[\s\n]+TOTVS[\s\n]+Information[\s\n]+System[\s\n]+only[\s\n]+users[\s\n]+with[\s\n]+authorized[\s\n]+This[\s\n]+system[\s\n]+is[\s\n]+monitored.)$
+    var_password_pam_remember: !!str 5
+    var_password_pam_remember_control_flag: !!str requisite,required
+    var_password_pam_dcredit: !!str -1
+    var_password_pam_dictcheck: !!str 1
+    var_password_pam_difok: !!str 8
+    var_password_pam_lcredit: !!str -1
+    var_password_pam_maxclassrepeat: !!str 8
+    var_password_pam_maxrepeat: !!str 0
+    var_password_pam_minclass: !!str 0
+    var_password_pam_minlen: !!str 15
+    var_password_pam_ocredit: !!str -1
+    var_password_pam_retry: !!str 3
+    var_password_pam_ucredit: !!str -1
+    var_password_hashing_algorithm: !!str SHA512
+    var_smartcard_drivers: !!str cac
+    var_password_pam_unix_rounds: !!str 5000
+    var_accounts_fail_delay: !!str 4
+    var_accounts_max_concurrent_login_sessions: !!str 10
+    var_accounts_tmout: !!str 600
+    var_user_initialization_files_regex: !!str ^(\.bashrc|\.zshrc|\.cshrc|\.profile|\.bash_login|\.bash_profile)$
+    var_audit_failure_mode: !!str 2
+    rsyslog_remote_loghost_address: !!str logcollector
+    sysctl_net_ipv6_conf_all_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv6_conf_all_forwarding_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_ra_value: !!str 0
+    sysctl_net_ipv6_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv6_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_all_accept_source_route_value: !!str 0
+    sysctl_net_ipv4_conf_all_rp_filter_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_redirects_value: !!str 1
+    sysctl_net_ipv4_conf_default_accept_source_route_value: !!str 1
+    sysctl_net_ipv4_conf_default_rp_filter_value: !!str 1
+    sysctl_net_ipv4_icmp_echo_ignore_broadcasts_value: !!str 1
+    sysctl_net_ipv4_tcp_invalid_ratelimit_value: !!str 500
+    sysctl_net_ipv4_tcp_syncookies_value: !!str 1
+    var_removable_partition: !!str /dev/cdrom
+    sysctl_kernel_kptr_restrict_value: !!str 1
+    var_slub_debug_options: !!str P
+    var_selinux_policy_name: !!str targeted
+    var_selinux_state: !!str permissive
+    var_postfix_root_mail_alias: !!str system.administrator@mail.mil
+    var_time_service_set_maxpoll: !!str 16
+    var_tftpd_secure_directory: !!str /var/lib/tftpboot
+    var_ssh_client_rekey_limit_size: !!str 512M
+    var_ssh_client_rekey_limit_time: !!str 1h
+    var_sshd_set_keepalive: !!str 0
+    sshd_idle_timeout_value: !!str 600
+    firewalld_sshd_zone: !!str public
+    var_sshd_disable_compression: !!str no
+    var_rekey_limit_size: !!str 1G
+    var_rekey_limit_time: !!str 1h
+    var_sssd_certificate_verification_digest_function: !!str sha512
+  tasks:
+    - name: Rollback debug-shell.socket configuration
+      systemd:
+        name: debug-shell.socket
+        enabled: 'yes'
+        state: started
+        masked: 'no'
+      when: socket_file_exists.stdout_lines is search("debug-shell.socket", multiline=True)
+      tags:
+        - rollback
+
+    - name: Revert changes in /etc/default/grub for GRUB_DISABLE_RECOVERY
+      replace:
+        path: /etc/default/grub
+        regexp: '^GRUB_DISABLE_RECOVERY=true'
+        replace: ''
+      when: '"grub2-common" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Rollback Interactive Boot in /etc/default/grub
+      replace:
+        path: /etc/default/grub
+        regexp: '^systemd.confirm_spawn=no'
+        replace: ''
+      when: '"grub2-common" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Revert changes in /etc/default/grub for removing systemd.confirm_spawn runtime
+      command: /sbin/grubby --update-kernel=ALL --args="systemd.confirm_spawn"
+      when: '"grub2-common" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Regenerate grub.cfg to rollback changes
+      command: grub2-mkconfig -o  /boot/grub2/grub.cfg
+      when: '"grub2-common" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Remove emergency mode password requirement
+      lineinfile:
+        path: /usr/lib/systemd/system/emergency.service
+        regexp: '^ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+
+    - name: Remove single user mode password requirement
+      lineinfile:
+        path: /usr/lib/systemd/system/rescue.service
+        regexp: '^ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+
+    - name: Rollback tmux installation
+      package:
+        name: tmux
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+
+    - name: Revert changes to support session locking with tmux in /etc/bashrc
+      replace:
+        path: /etc/bashrc
+        regexp: '.*case "$name" in sshd|login) exec tmux ;; esac.*'
+        replace: ''
+      when: '"tmux" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Revert changes to support session locking with tmux in /etc/profile.d/*.sh
+      replace:
+        path: "{{ item }}"
+        regexp: '.*case "$name" in sshd|login) exec tmux ;; esac.*'
+        replace: ''
+      loop: "{{ tmux_in_profile_d.files | map(attribute='path') | list }}"
+      when: '"tmux" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Rollback systemd-coredump.socket configuration
+      systemd:
+        name: systemd-coredump.socket
+        state: started
+        enabled: 'yes'
+        masked: 'no'
+      when: result_systemd_unit_files.stdout_lines is search("systemd-coredump.socket")
+      tags:
+        - rollback
+
+    - name: Rollback grub configuration for page_poison=1
+      command: /sbin/grubby --update-kernel=ALL --remove-args="page_poison=1"
+      when: '"grub2-common" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Rollback grub configuration for slub_debug
+      command: /sbin/grubby --update-kernel=ALL --remove-args="slub_debug={{ var_slub_debug_options }}"
+      when: '"grub2-common" in ansible_facts.packages'
+      tags:
+        - rollback
+
+    - name: Remove policycoreutils-python-utils package
+      package:
+        name: policycoreutils-python-utils
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+
+    - name: Remove policycoreutils package
+      package:
+        name: policycoreutils
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+
+    - name: Rollback SELinux Policy Configuration
+      block:
+        - name: Revert SELinux Policy Configuration
+          lineinfile:
+            path: /etc/selinux/config
+            state: absent
+            regexp: "{{ item.regexp }}"
+          with_items:
+            - { regexp: '^SELINUXTYPE=' }
+
+        - name: Revert SELinux State Configuration
+          lineinfile:
+            path: /etc/selinux/config
+            state: absent
+            regexp: "{{ item.regexp }}"
+          with_items:
+            - { regexp: '^SELINUX=' }
+
+      tags:
+        - rollback
+
+    - name: Rollback to previous runlevel
+      file:
+        src: /usr/lib/systemd/system/multi-user.target
+        dest: /etc/systemd/system/default.target
+        state: link
+        force: true
+      tags:
+        - rollback
+
+    - name: Rollback Debug Shell Service Configuration
+      block:
+        - name: Enable service debug-shell
+          systemd:
+            name: debug-shell.service
+            enabled: 'yes'
+            state: started
+            masked: 'no'
+          ignore_errors: yes
+
+        - name: Enable socket debug-shell
+          systemd:
+            name: debug-shell.socket
+            enabled: 'yes'
+            state: started
+            masked: 'no'
+          ignore_errors: yes
+
+      tags:
+        - rollback
+
+    - name: Revert changes made by disabling Ctrl-Alt-Del Reboot Activation
+      systemd:
+        name: ctrl-alt-del.target
+        force: false
+        masked: false
+        state: started
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - disable_ctrlaltdel_reboot
+
+    - name: Revert changes made by kernel module 'usb-storage' configuration
+      lineinfile:
+        dest: /etc/modprobe.d/usb-storage.conf
+        regexp: '^install\s+usb-storage'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_usb-storage_disabled
+
+    - name: Revert changes made by kernel module 'usb-storage' configuration
+      lineinfile:
+        dest: /etc/modprobe.d/usb-storage.conf
+        regexp: '^blacklist usb-storage$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_usb-storage_disabled
+
+    - name: Revert changes made by kernel module 'cramfs' configuration
+      lineinfile:
+        dest: /etc/modprobe.d/cramfs.conf
+        regexp: '^install\s+cramfs'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_cramfs_disabled
+
+    - name: Revert changes made by kernel module 'cramfs' configuration
+      lineinfile:
+        dest: /etc/modprobe.d/cramfs.conf
+        regexp: '^blacklist cramfs$'
+        state: absent
+      when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+      tags:
+        - rollback
+        - kernel_module_cramfs_disabled
+
+    - name: Revert changes made by disabling core dump backtraces
+      block:
+        - name: Revert changes in /etc/systemd/coredump.conf for ProcessSizeMax
+          lineinfile:
+            path: /etc/systemd/coredump.conf
+            create: false
+            regexp: '^ProcessSizeMax\s*=\s*0'
+            state: absent
+          when: '"systemd" in ansible_facts.packages'
+          tags:
+            - rollback
+            - coredump_disable_backtraces
+
+        - name: Revert changes in /etc/systemd/coredump.conf for Storage
+          lineinfile:
+            path: /etc/systemd/coredump.conf
+            create: false
+            regexp: '^Storage\s*=\s*none'
+            state: absent
+          when: '"systemd" in ansible_facts.packages'
+          tags:
+            - rollback
+            - coredump_disable_storage
+
+    - name: Revert changes made by disabling core dumps with limits in /etc/security/limits.conf
+      lineinfile:
+        dest: /etc/security/limits.conf
+        regexp: '^\*\s+hard\s+core\s+0'
+        state: absent
+      when: '"pam" in ansible_facts.packages'
+      tags:
+        - rollback
+        - disable_users_coredumps
+
+
+    - name: Revert changes made to kernel.randomize_va_space
+      block:
+        - name: Uncomment occurrences of kernel.randomize_va_space in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*kernel.randomize_va_space'
+            replace: 'kernel.randomize_va_space'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_randomize_va_space
+
+        - name: Ensure sysctl kernel.randomize_va_space is set to default
+          sysctl:
+            name: kernel.randomize_va_space
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_randomize_va_space
+
+    - name: Revert changes made to kernel.core_pattern
+      block:
+        - name: Uncomment occurrences of kernel.core_pattern in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*kernel.core_pattern'
+            replace: 'kernel.core_pattern'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_core_pattern
+
+        - name: Ensure sysctl kernel.core_pattern is set to default
+          sysctl:
+            name: kernel.core_pattern
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_core_pattern
+
+    - name: Revert changes made to kernel.dmesg_restrict
+      block:
+        - name: Uncomment occurrences of kernel.dmesg_restrict in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*kernel.dmesg_restrict'
+            replace: 'kernel.dmesg_restrict'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_dmesg_restrict
+
+        - name: Ensure sysctl kernel.dmesg_restrict is set to default
+          sysctl:
+            name: kernel.dmesg_restrict
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_dmesg_restrict
+
+    - name: Revert changes made to kernel.kexec_load_disabled
+      block:
+        - name: Uncomment occurrences of kernel.kexec_load_disabled in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*kernel.kexec_load_disabled'
+            replace: 'kernel.kexec_load_disabled'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_kexec_load_disabled
+
+        - name: Ensure sysctl kernel.kexec_load_disabled is set to default
+          sysctl:
+            name: kernel.kexec_load_disabled
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_kexec_load_disabled
+
+    - name: Revert changes made to kernel.perf_event_paranoid
+      block:
+        - name: Uncomment occurrences of kernel.perf_event_paranoid in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*kernel.perf_event_paranoid'
+            replace: 'kernel.perf_event_paranoid'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_perf_event_paranoid
+
+        - name: Ensure sysctl kernel.perf_event_paranoid is set to default
+          sysctl:
+            name: kernel.perf_event_paranoid
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_perf_event_paranoid
+
+    - name: Revert changes made to kernel.yama.ptrace_scope
+      block:
+        - name: Uncomment occurrences of kernel.yama.ptrace_scope in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*kernel.yama.ptrace_scope'
+            replace: 'kernel.yama.ptrace_scope'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_yama_ptrace_scope
+
+        - name: Ensure sysctl kernel.yama.ptrace_scope is set to default
+          sysctl:
+            name: kernel.yama.ptrace_scope
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_kernel_yama_ptrace_scope
+
+    - name: Revert changes made to net.core.bpf_jit_harden
+      block:
+        - name: Uncomment occurrences of net.core.bpf_jit_harden in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*net.core.bpf_jit_harden'
+            replace: 'net.core.bpf_jit_harden'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_net_core_bpf_jit_harden
+
+        - name: Ensure sysctl net.core.bpf_jit_harden is set to default
+          sysctl:
+            name: net.core.bpf_jit_harden
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_net_core_bpf_jit_harden
+
+    - name: Revert changes made to user.max_user_namespaces
+      block:
+        - name: Uncomment occurrences of user.max_user_namespaces in config files
+          replace:
+            path: '{{ item.path }}'
+            regexp: '^#\s*user.max_user_namespaces'
+            replace: 'user.max_user_namespaces'
+          loop: '{{ find_sysctl_d.files }}'
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_user_max_user_namespaces
+
+        - name: Ensure sysctl user.max_user_namespaces is set to default
+          sysctl:
+            name: user.max_user_namespaces
+            sysctl_file: /etc/sysctl.conf
+            state: absent
+            reload: true
+          when: ansible_virtualization_type not in ["docker", "lxc", "openvz", "podman", "container"]
+          tags:
+            - rollback
+            - sysctl_user_max_user_namespaces
