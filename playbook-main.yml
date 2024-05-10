@@ -1,0 +1,130 @@
+- name: Executar comando e gravar em log
+  hosts: all
+  tasks:
+    - name: Playbook-adicionalprotecao
+      command: ansible-playbook -i "localhost," -c local playbook-adicionalprotecao.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-audit
+      command: ansible-playbook -i "localhost," -c local playbook-audit.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+
+    - name: Playbook-criptografia_passwords
+      command: ansible-playbook -i "localhost," -c local playbook-criptografia_passwords.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-device_disk_volume
+      command: ansible-playbook -i "localhost," -c local playbook-device_disk_volume.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-elevacaoPrivilegio
+      command: ansible-playbook -i "localhost," -c local playbook-elevacaoPrivilegio.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-gnome
+      command: ansible-playbook -i "localhost," -c local playbook-gnome.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-rede
+      command: ansible-playbook -i "localhost," -c local playbook-rede.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-shell_kernel_grub
+      command: ansible-playbook -i "localhost," -c local playbook-shell_kernel_grub.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
+    - name: Playbook-system_configuration_sssd_ssh
+      command: ansible-playbook -i "localhost," -c local playbook-system_configuration_sssd_ssh.yml
+      register: result
+
+    - name: Obter timestamp
+      command: date +"%Y-%m-%d %H:%M:%S"
+      register: timestamp
+
+    - name: Gravar resultado no arquivo de log
+      lineinfile:
+        path: /var/log/ansible_command_log.txt
+        line: "{{ timestamp.stdout }} - {{ result.stdout }}"
+        create: yes
+
